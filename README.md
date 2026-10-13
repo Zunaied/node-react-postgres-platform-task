@@ -1,4 +1,4 @@
-# Node + React + Postgres — Production-Style Local Platform
+### Node + React + Postgres — Production-Style Local Platform
 
 A simple full-stack app (React + Node.js/Express + PostgreSQL) taken through
 six stages: containerization, Kubernetes, Ingress/API gateway, CI/CD,
