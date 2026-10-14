@@ -13,20 +13,6 @@ pipeline {
 
   stages {
 
-    stage('Tools on the agent') {
-      steps {
-        sh '''
-          echo "--- user and host"
-          whoami; hostname
-          echo "--- docker"
-          docker version --format 'client={{.Client.Version}} server={{.Server.Version}}'
-          echo "--- kubectl"
-          kubectl version --client
-          echo "--- git"
-          git --version
-        '''
-      }
-    }
 
     stage('Docker Hub') {
       steps {
