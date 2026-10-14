@@ -13,6 +13,22 @@ pipeline {
 
   stages {
 
+    stage('Tools in the Jenkins container') {
+      steps {
+        sh '''
+          echo "--- user and host"
+          whoami; hostname
+          echo "--- docker client"
+          docker --version
+          echo "--- docker daemon (through the socket)"
+          docker info --format 'server={{.ServerVersion}} os={{.OperatingSystem}}'
+          echo "--- kubectl"
+          kubectl version --client
+          echo "--- git"
+          git --version
+        '''
+      }
+    }
 
     stage('Docker Hub') {
       steps {
