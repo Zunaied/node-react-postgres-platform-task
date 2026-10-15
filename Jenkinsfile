@@ -101,7 +101,7 @@ pipeline {
             fi
 
             # Secrets are NOT applied from Git. They are created once per namespace.
-            kubectl apply -f .render/configuration/ -f .render/storage -f ./render/postgreql
+            kubectl apply -f .render/configuration/ -f .render/storage -f .render/postgreql
             kubectl apply -f .render/backend -f .render/frontend -f .render/ingress -f .render/redis
 
             kubectl -n "$TARGET_NS" annotate deploy/backend deploy/frontend \
