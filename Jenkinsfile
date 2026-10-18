@@ -18,24 +18,25 @@ pipeline {
 
   stages {
 
-    // Map the branch to a namespace and build the image tag.
+    // Map the branch to a namespace and a manifest folder. Build the image tag.
     stage('Prepare') {
       steps {
         script {
           def branch = env.BRANCH_NAME ?: 'unknown'
           if (branch == 'master' || branch == 'main') {
-            env.TARGET_NS = 'dev';     env.APP_HOST = 'node-react.local'
+            env.TARGET_NS = 'dev';     env.K8S_DIR = 'k8s'
           } else if (branch.startsWith('pre-release/v')) {
-            env.TARGET_NS = 'preprod'; env.APP_HOST = 'preprod.node-react.local'
+            env.TARGET_NS = 'preprod'; env.K8S_DIR = 'k8s.preprod'
           } else if (branch.startsWith('release/v')) {
-            env.TARGET_NS = 'release'; env.APP_HOST = 'release.node-react.local'
+            env.TARGET_NS = 'release'; env.K8S_DIR = 'k8s.release'
           } else {
             env.TARGET_NS = ''
+            env.K8S_DIR   = ''
           }
           def safe = branch.toLowerCase().replaceAll('[^a-z0-9._-]', '-')
           def sha  = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
           env.IMAGE_TAG = "${env.VERSION_BASE}.${env.BUILD_NUMBER}-${safe}-${sha}"
-          echo "branch=${branch} namespace=${env.TARGET_NS ?: 'none (build only)'} tag=${env.IMAGE_TAG}"
+          echo "branch=${branch} namespace=${env.TARGET_NS ?: 'none (build only)'} folder=${env.K8S_DIR ?: 'none'} tag=${env.IMAGE_TAG}"
         }
       }
     }
@@ -83,26 +84,34 @@ pipeline {
         withCredentials([file(credentialsId: 'kubeconfig-cicd', variable: 'KUBECONFIG')]) {
           sh '''
             set -eu
-            rm -rf .render && mkdir .render
-            cp -r k8s/postgreql k8s/storage k8s/redis k8s/configuration k8s/backend k8s/frontend k8s/ingress .render/
 
-            # Point every manifest at the target namespace and host
-            find .render -name '*.yaml' -exec sed -i \
-              -e "s/namespace: dev/namespace: ${TARGET_NS}/" \
-              -e "s/node-react.local/${APP_HOST}/" {} +
+            echo "Deploying from folder: $K8S_DIR to namespace: $TARGET_NS"
+            test -d "$K8S_DIR" || { echo "Folder $K8S_DIR not found"; exit 1; }
+
+            # Work on a copy. Git files stay unchanged.
+            rm -rf .render && mkdir .render
+            cp -r "$K8S_DIR"/. .render/
+
+            # Safety check: every namespace in the folder must match the target.
+            bad=$(grep -rhE '^[[:space:]]*namespace:' .render | grep -vE "namespace:[[:space:]]*${TARGET_NS}[[:space:]]*$" || true)
+            if [ -n "$bad" ]; then
+              echo "Wrong namespace found in $K8S_DIR (expected $TARGET_NS):"
+              echo "$bad"
+              exit 1
+            fi
 
             # Use the images built in this run
             sed -i "s|image: .*node-react-backend:.*|image: ${BACKEND_IMAGE}:${IMAGE_TAG}|"   .render/backend/backend-deployment.yaml
             sed -i "s|image: .*node-react-frontend:.*|image: ${FRONTEND_IMAGE}:${IMAGE_TAG}|" .render/frontend/frontend-deployment.yaml
 
-            # Only dev keeps the fixed NodePort
-            if [ "$TARGET_NS" != "dev" ]; then
-              sed -i '/nodePort:/d' .render/frontend/frontend-service.yaml
-            fi
-
             # Secrets are NOT applied from Git. They are created once per namespace.
-            kubectl apply -f .render/configuration/ -f .render/storage -f .render/postgreql
-            kubectl apply -f .render/backend -f .render/frontend -f .render/ingress -f .render/redis
+            # Apply in order. Skip a folder if it does not exist.
+            for d in namespace configuration storage postgreql redis search backend frontend ingress; do
+              if [ -d ".render/$d" ]; then
+                echo "Applying $d"
+                kubectl apply -f ".render/$d"
+              fi
+            done
 
             kubectl -n "$TARGET_NS" annotate deploy/backend deploy/frontend \
               kubernetes.io/change-cause="build ${BUILD_NUMBER} ${IMAGE_TAG}" --overwrite
