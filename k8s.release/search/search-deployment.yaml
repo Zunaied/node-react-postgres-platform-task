@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: search
-  namespace: dev
+  namespace: release
   labels:
     app: search
 spec:
