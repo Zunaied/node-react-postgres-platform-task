@@ -133,8 +133,13 @@ pipeline {
         if (env.DEPLOY_STARTED == 'true') {
           withCredentials([file(credentialsId: 'kubeconfig-cicd', variable: 'KUBECONFIG')]) {
             sh '''
-              kubectl -n "$TARGET_NS" rollout undo deploy/backend  || true
-              kubectl -n "$TARGET_NS" rollout undo deploy/frontend || true
+              for d in backend frontend; do
+                if kubectl -n "$TARGET_NS" get deploy/$d > /dev/null 2>&1; then
+                  kubectl -n "$TARGET_NS" rollout undo deploy/$d || echo "No old revision for $d. Skipping rollback."
+                else
+                  echo "deploy/$d does not exist in $TARGET_NS. Nothing to roll back."
+                fi
+              done
             '''
           }
         }
