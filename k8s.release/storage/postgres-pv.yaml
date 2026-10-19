@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: postgres-pv
+  name: release-postgres-pv
 spec:
   capacity:
     storage: 5Gi
@@ -10,7 +10,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: local-storage
   hostPath:
-    path: /data/postgres
+    path: /data/release/postgres
   nodeAffinity:
     required:
       nodeSelectorTerms:

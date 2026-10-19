@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: preprod-postgres-pv
+  name: preprod-postgres-pvc
   namespace: preprod
 spec:
   accessModes: [ReadWriteOnce]
   storageClassName: local-storage
-  volumeName: postgres-pv
+  volumeName: preprod-postgres-pv
   resources:
     requests:
       storage: 2Gi
